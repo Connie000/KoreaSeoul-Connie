@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>首爾日記 Pro - 2026</title>
+    <title>首爾日記 Pro+ 2026</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -11,7 +11,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
         body { font-family: 'Noto+Sans+TC', sans-serif; -webkit-tap-highlight-color: transparent; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        input[type="number"]::-webkit-inner-spin-button { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-[#FFFCF5]">
@@ -22,9 +22,7 @@
                 <h1 class="text-xl font-black tracking-tight flex items-center gap-2">首爾日記 <span class="text-rose-300">🇰🇷</span></h1>
                 <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest mt-0.5">May 2026 • Seoul Journey</p>
             </div>
-            <button @click="activeTab = 'info'" class="p-2.5 bg-orange-50 text-orange-400 rounded-2xl active:scale-90 transition-transform">
-                <i data-lucide="info" class="w-[18px] h-[18px]"></i>
-            </button>
+            <button @click="activeTab = 'info'" class="p-2.5 bg-orange-50 text-orange-400 rounded-2xl active:scale-90"><i data-lucide="info" class="w-[18px]"></i></button>
         </header>
 
         <div class="flex-1 overflow-y-auto px-5 pt-4 pb-32 no-scrollbar">
@@ -47,56 +45,43 @@
                                 <i data-lucide="clock" class="w-3 h-3"></i> {{ item.time }}
                             </span>
                             <div class="flex items-center gap-1">
-                                <button @click="openEdit(item)" class="p-1.5 text-slate-300"><i data-lucide="edit-3" class="w-[15px]"></i></button>
-                                <button @click="moveItem(item.id, 'up')" :disabled="idx===0" class="p-1.5 text-slate-300 disabled:opacity-20"><i data-lucide="chevron-up" class="w-[15px]"></i></button>
-                                <button @click="moveItem(item.id, 'down')" :disabled="idx===filteredItinerary.length-1" class="p-1.5 text-slate-300 disabled:opacity-20"><i data-lucide="chevron-down" class="w-[15px]"></i></button>
+                                <button @click="openEdit(item)" class="p-1.5 text-slate-300 active:text-orange-400"><i data-lucide="edit-3" class="w-[15px]"></i></button>
+                                <button @click="moveItem(item.id, 'up')" :disabled="idx === 0" :class="['p-1.5', idx === 0 ? 'text-slate-100' : 'text-slate-300']"><i data-lucide="chevron-up" class="w-[15px]"></i></button>
+                                <button @click="moveItem(item.id, 'down')" :disabled="idx === filteredItinerary.length - 1" :class="['p-1.5', idx === filteredItinerary.length - 1 ? 'text-slate-100' : 'text-slate-300']"><i data-lucide="chevron-down" class="w-[15px]"></i></button>
                             </div>
                         </div>
                         <h3 class="text-base font-black text-slate-800 leading-tight">{{ item.title }}</h3>
                         <p class="text-[12px] text-blue-400 mt-1.5 mb-3 flex items-start gap-1 font-bold" @click="openGoogleMaps(item.addr)">
                             <i data-lucide="map-pin" class="w-3 h-3 mt-0.5"></i> {{ item.addr }}
                         </p>
-                        <div v-if="item.note" class="bg-slate-50/50 p-3.5 rounded-2xl text-[11px] text-slate-400 font-medium border border-slate-100/50">{{ item.note }}</div>
-                        <button @click="driverTarget = item" class="absolute bottom-4 right-4 bg-white border border-orange-100 text-orange-400 p-3 rounded-2xl shadow-sm active:scale-95">
-                            <i data-lucide="car" class="w-[18px]"></i>
-                        </button>
+                        <div v-if="item.note" class="bg-slate-50 p-3.5 rounded-2xl text-[11px] text-slate-400 leading-relaxed border border-slate-100/50 whitespace-pre-wrap">{{ item.note }}</div>
+                        
+                        <button @click="driverTarget = item" class="absolute bottom-4 right-4 bg-white border border-orange-100 text-orange-400 p-3 rounded-2xl shadow-sm"><i data-lucide="car" class="w-[18px]"></i></button>
                     </div>
-                    <button @click="showAddModal = true; editingItem = null;" class="w-full py-5 bg-white border-2 border-dashed border-orange-100 rounded-[2.2rem] text-orange-200 font-black text-xs uppercase tracking-widest">+ 新增行程項目</button>
+                    <button @click="openAddModal('itinerary')" class="w-full py-5 bg-white border-2 border-dashed border-orange-100 rounded-[2.2rem] text-orange-200 font-black text-xs uppercase tracking-widest">+ 新增行程項目</button>
                 </div>
             </div>
 
             <div v-if="activeTab === 'shopping'" class="space-y-5">
-                <div class="bg-gradient-to-br from-rose-50 to-orange-50 p-7 rounded-[2.8rem] border border-white shadow-sm relative overflow-hidden">
+                <div class="bg-gradient-to-br from-rose-50 to-orange-50 p-7 rounded-[2.8rem] border border-white shadow-sm">
                     <div class="flex justify-between items-end mb-4">
-                        <div>
-                            <p class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">購物支出總計</p>
-                            <h2 class="text-3xl font-black text-slate-800">₩ {{ stats.spentShop.toLocaleString() }}</h2>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-[10px] font-bold text-slate-300 mb-1">預算上限</p>
-                            <input v-model="shopBudgetLimit" type="number" class="bg-transparent text-xl font-black text-orange-400 text-right w-24 outline-none border-b border-orange-100">
-                        </div>
+                        <div><p class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">購物支出總計</p><h2 class="text-3xl font-black text-slate-800">₩ {{ stats.spentShop.toLocaleString() }}</h2></div>
+                        <div class="text-right"><p class="text-[10px] font-bold text-slate-300 mb-1">預算上限</p><input v-model="shopBudgetLimit" type="number" class="bg-transparent text-xl font-black text-orange-400 text-right w-24 outline-none border-b border-orange-100"></div>
                     </div>
-                    <div class="h-2 bg-white rounded-full overflow-hidden mb-6">
-                        <div class="h-full bg-rose-300 transition-all duration-500" :style="{ width: Math.min((stats.spentShop / shopBudgetLimit) * 100, 100) + '%' }"></div>
-                    </div>
+                    <div class="h-2 bg-white rounded-full overflow-hidden mb-6"><div class="h-full bg-rose-300 transition-all duration-500" :style="{ width: Math.min((stats.spentShop / shopBudgetLimit) * 100, 100) + '%' }"></div></div>
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-white/40 p-3 rounded-2xl border border-white">
-                            <p class="text-[9px] font-black text-rose-300 uppercase mb-1">惠 個人</p>
-                            <p class="text-sm font-bold">₩{{ stats.huiSelf.toLocaleString() }}</p>
-                        </div>
-                        <div class="bg-white/40 p-3 rounded-2xl border border-white">
-                            <p class="text-[9px] font-black text-blue-300 uppercase mb-1">凡 個人</p>
-                            <p class="text-sm font-bold">₩{{ stats.fanSelf.toLocaleString() }}</p>
-                        </div>
+                        <div class="bg-white/40 p-3 rounded-2xl border border-white"><p class="text-[9px] font-black text-rose-300 mb-1">惠 個人</p><p class="text-sm font-bold">₩{{ stats.huiSelf.toLocaleString() }}</p></div>
+                        <div class="bg-white/40 p-3 rounded-2xl border border-white"><p class="text-[9px] font-black text-blue-300 mb-1">凡 個人</p><p class="text-sm font-bold">₩{{ stats.fanSelf.toLocaleString() }}</p></div>
                     </div>
                 </div>
-                <div v-for="s in shopping" :key="s.id" class="bg-white p-4 rounded-[2rem] flex items-center gap-4 border border-slate-50 shadow-sm" :class="{'opacity-50 grayscale': s.bought}">
-                    <div class="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
-                        <i data-lucide="camera" class="text-slate-200"></i>
+
+                <div v-for="s in shopping" :key="s.id" class="bg-white p-4 rounded-[2.2rem] flex items-center gap-4 border border-slate-50 shadow-sm" :class="{'opacity-50 grayscale': s.bought}">
+                    <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200 overflow-hidden relative">
+                        <img v-if="s.photo" :src="s.photo" class="w-full h-full object-cover">
+                        <i v-else data-lucide="camera" class="text-slate-300 w-6 h-6"></i>
                     </div>
-                    <div class="flex-1">
-                        <p class="font-black text-slate-800 text-sm">{{ s.name }}</p>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black text-slate-800 text-sm truncate">{{ s.name }}</p>
                         <div class="flex items-center gap-2 mt-1">
                             <span class="text-[11px] font-black text-orange-400">₩{{ s.price.toLocaleString() }}</span>
                             <span :class="['text-[8px] font-black px-1.5 py-0.5 rounded-md', s.owner === '惠' ? 'bg-rose-50 text-rose-400' : 'bg-blue-50 text-blue-400']">{{ s.owner }}</span>
@@ -105,103 +90,96 @@
                     <button @click="s.bought = !s.bought" :class="['w-9 h-9 rounded-xl border-2 flex items-center justify-center transition-all', s.bought ? 'bg-emerald-400 border-emerald-400 text-white' : 'border-slate-100 text-transparent']"><i data-lucide="check" class="w-4 h-4"></i></button>
                     <button @click="deleteItem('shopping', s.id)" class="text-slate-200 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                 </div>
-                <button @click="showAddModal = true; editingItem = null;" class="w-full py-5 bg-white border-2 border-dashed border-rose-100 rounded-[2rem] text-rose-200 font-black text-xs uppercase tracking-widest">+ 新增購物項目</button>
+                <button @click="openAddModal('shopping')" class="w-full py-5 bg-white border-2 border-dashed border-rose-100 rounded-[2.2rem] text-rose-200 font-black text-xs uppercase tracking-widest">+ 新增購物項目</button>
             </div>
 
             <div v-if="activeTab === 'budget'" class="space-y-5">
                 <div class="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm text-center">
-                    <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-3">共同開銷總覽</p>
+                    <p class="text-[10px] font-black text-slate-300 uppercase mb-3">共同開銷總覽</p>
                     <h2 class="text-4xl font-black text-slate-800">₩ {{ stats.totalExp.toLocaleString() }}</h2>
                     <div class="grid grid-cols-2 gap-6 mt-8 pt-6 border-t border-slate-50">
-                        <div class="space-y-1">
-                            <p class="text-[10px] font-black text-rose-300">惠 先付</p>
-                            <p class="text-base font-black">₩{{ stats.huiPay.toLocaleString() }}</p>
-                        </div>
-                        <div class="space-y-1">
-                            <p class="text-[10px] font-black text-blue-300">凡 先付</p>
-                            <p class="text-base font-black">₩{{ stats.fanPay.toLocaleString() }}</p>
-                        </div>
+                        <div class="space-y-1"><p class="text-[10px] font-black text-rose-300">惠 先付</p><p class="text-base font-black">₩{{ stats.huiPay.toLocaleString() }}</p></div>
+                        <div class="space-y-1"><p class="text-[10px] font-black text-blue-300">凡 先付</p><p class="text-base font-black">₩{{ stats.fanPay.toLocaleString() }}</p></div>
                     </div>
                 </div>
                 <div v-for="b in budget" :key="b.id" class="bg-white p-4.5 rounded-[1.8rem] flex justify-between items-center border border-slate-50">
                     <div class="flex items-center gap-3">
-                        <span :class="['w-9 h-9 rounded-2xl flex items-center justify-center text-[10px] font-black', b.payer==='惠' ? 'bg-rose-50 text-rose-400':'bg-blue-50 text-blue-400']">{{b.payer}}</span>
+                        <span :class="['w-9 h-9 rounded-2xl flex items-center justify-center text-[10px] font-black', b.payer==='惠' ? 'bg-rose-50 text-rose-400' : 'bg-blue-50 text-blue-400']">{{b.payer}}</span>
                         <span class="font-black text-slate-700 text-sm">{{b.n}}</span>
                     </div>
-                    <div class="flex items-center gap-4">
-                        <p class="text-sm font-black">₩{{b.p.toLocaleString()}}</p>
-                        <button @click="deleteItem('budget', b.id)" class="text-slate-200"><i data-lucide="x" class="w-[18px]"></i></button>
-                    </div>
+                    <div class="flex items-center gap-4"><p class="text-sm font-black">₩{{b.p.toLocaleString()}}</p><button @click="deleteItem('budget', b.id)" class="text-slate-200"><i data-lucide="x" class="w-[18px]"></i></button></div>
                 </div>
-                <button @click="showAddModal = true; editingItem = null;" class="w-full py-5 bg-slate-800 text-white rounded-[2.2rem] font-black shadow-lg text-xs tracking-widest mt-4">+ 記錄公積金支出</button>
+                <button @click="openAddModal('budget')" class="w-full py-5 bg-slate-800 text-white rounded-[2.2rem] font-black shadow-lg text-xs tracking-widest mt-4">+ 記錄公積金支出</button>
             </div>
 
             <div v-if="activeTab === 'info'" class="space-y-6">
                 <div class="bg-white p-6 rounded-[2.5rem] border border-orange-50 shadow-sm">
-                    <p class="text-[11px] font-black text-slate-300 mb-5 flex items-center gap-2 uppercase tracking-widest"><i data-lucide="arrow-right-left" class="w-[14px]"></i> 匯率換算 (1:41.6)</p>
+                    <p class="text-[11px] font-black text-slate-300 mb-5 flex items-center gap-2 uppercase tracking-widest"><i data-lucide="arrow-right-left" class="w-[14px]"></i> 匯率換算 (約 1:41.6)</p>
                     <div class="flex items-center gap-4">
-                        <div class="flex-1 bg-slate-50 rounded-2xl p-4">
-                            <p class="text-[9px] font-black text-slate-300 mb-1">KRW ₩</p>
-                            <input v-model="calcInput" type="number" class="w-full font-black text-lg bg-transparent outline-none" placeholder="0">
-                        </div>
-                        <div class="flex-1 bg-orange-50 rounded-2xl p-4 text-orange-600">
-                            <p class="text-[9px] font-black opacity-60 mb-1">TWD NT$</p>
-                            <p class="text-lg font-black">{{ Math.round(calcInput * 0.024).toLocaleString() }}</p>
-                        </div>
+                        <div class="flex-1 bg-slate-50 rounded-2xl p-4"><p class="text-[9px] font-black text-slate-300 mb-1">KRW ₩</p><input v-model="calcInput" type="number" class="w-full font-black text-lg bg-transparent outline-none" placeholder="0"></div>
+                        <div class="flex-1 bg-orange-50 rounded-2xl p-4 text-orange-600"><p class="text-[9px] font-black opacity-60 mb-1">TWD NT$</p><p class="text-lg font-black">{{ Math.round(calcInput * 0.024).toLocaleString() }}</p></div>
                     </div>
                 </div>
-                <div class="bg-blue-50 p-8 rounded-[2.8rem] text-blue-600 border border-blue-100 relative overflow-hidden">
-                    <i data-lucide="building-2" class="absolute -right-6 -bottom-6 opacity-10 w-32 h-32"></i>
-                    <h3 class="font-black text-xs mb-5 flex items-center gap-2 uppercase tracking-widest"><i data-lucide="building-2" class="w-4 h-4"></i> 住宿資訊</h3>
-                    <p class="text-xl font-black leading-tight mb-3">{{hotelInfo.name}}</p>
-                    <p class="text-[11px] opacity-70 leading-relaxed flex items-start gap-2 mb-4 font-bold"><i data-lucide="map-pin" class="w-3 h-3 mt-0.5"></i> {{hotelInfo.addr}}</p>
-                    <div class="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-xl text-xs font-black shadow-sm"><i data-lucide="phone" class="w-3 h-3"></i> {{hotelInfo.tel}}</div>
+                <div class="bg-white p-6 rounded-[2.8rem] border border-orange-50 shadow-sm">
+                    <div class="flex justify-between items-center mb-5"><h3 class="font-black text-[11px] text-slate-400 uppercase tracking-widest">口袋名單</h3><button @click="openAddModal('wishlist')" class="p-1.5 bg-orange-50 text-orange-400 rounded-xl"><i data-lucide="plus" class="w-4 h-4"></i></button></div>
+                    <div class="space-y-3"><div v-for="w in wishlist" :key="w.id" class="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between"><div><p class="font-black text-sm text-slate-800">{{w.name}}</p><p class="text-[10px] text-blue-400 mt-1" @click="openGoogleMaps(w.addr)">{{w.addr}}</p></div><button @click="deleteItem('wishlist', w.id)" class="text-slate-200"><i data-lucide="x" class="w-4 h-4"></i></button></div></div>
+                </div>
+                <div class="bg-blue-50 p-8 rounded-[2.8rem] text-blue-600 border border-blue-100">
+                    <h3 class="font-black text-xs mb-3 flex items-center gap-2 uppercase"><i data-lucide="building-2" class="w-4"></i> 住宿</h3>
+                    <p class="text-xl font-black leading-tight">{{hotelInfo.name}}</p>
+                    <p class="text-[11px] opacity-70 mt-2">{{hotelInfo.addr}}</p>
                 </div>
             </div>
-
         </div>
 
         <nav class="fixed bottom-0 left-0 right-0 h-28 bg-white/70 backdrop-blur-xl border-t border-orange-50 flex justify-around items-center px-6 pb-8 z-50">
-            <button v-for="t in tabs" :key="t.id" @click="activeTab = t.id"
-                :class="['flex flex-col items-center gap-1.5 transition-all', activeTab === t.id ? 'text-orange-400 scale-105' : 'text-slate-300']">
-                <div :class="['p-2.5 rounded-2xl', activeTab === t.id ? 'bg-orange-50' : '']">
-                    <i :data-lucide="t.icon" class="w-[22px] h-[22px]"></i>
-                </div>
-                <span class="text-[10px] font-black tracking-tighter uppercase">{{ t.label }}</span>
+            <button v-for="t in tabs" :key="t.id" @click="activeTab = t.id" :class="['flex flex-col items-center gap-1.5 transition-all', activeTab === t.id ? 'text-orange-400 scale-105' : 'text-slate-300']">
+                <div :class="['p-2.5 rounded-2xl', activeTab === t.id ? 'bg-orange-50' : '']"><i :data-lucide="t.icon" class="w-[22px]"></i></div>
+                <span class="text-[10px] font-black uppercase">{{ t.label }}</span>
             </button>
         </nav>
 
         <div v-if="showAddModal" class="fixed inset-0 z-[100] flex items-end">
-            <div class="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" @click="showAddModal = false"></div>
+            <div class="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" @click="closeModal"></div>
             <div class="relative w-full bg-white rounded-t-[3rem] p-8 pb-14 shadow-2xl animate-in slide-in-from-bottom duration-300">
                 <div class="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8"></div>
                 
-                <div v-if="activeTab === 'itinerary'" class="space-y-4">
+                <div v-if="modalType === 'itinerary'" class="space-y-4">
                     <h2 class="text-center text-lg font-black">{{ editingItem ? '編輯行程' : '新增行程' }}</h2>
-                    <input v-model="form.title" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="景點名稱">
-                    <input v-model="form.time" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="時間 (12:00)">
-                    <input v-model="form.addr" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="地址">
-                    <button @click="saveItinerary" class="w-full py-5 bg-slate-800 text-white rounded-[2rem] font-black shadow-lg mt-4">儲存行程</button>
+                    <input v-model="form.title" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="地點名稱">
+                    <div class="flex gap-4">
+                        <input v-model="form.time" class="flex-1 p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="時間">
+                        <input v-model="form.addr" class="flex-[2] p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="地址">
+                    </div>
+                    <textarea v-model="form.note" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none h-24" placeholder="備註 (行程重點、必點食物...)"></textarea>
+                    <button @click="saveData" class="w-full py-5 bg-slate-800 text-white rounded-[2rem] font-black shadow-lg">儲存</button>
                 </div>
 
-                <div v-if="activeTab === 'shopping'" class="space-y-4">
-                    <h2 class="text-center text-lg font-black">新增購物</h2>
-                    <input v-model="form.title" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="品項名稱">
-                    <input v-model="form.price" type="number" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="金額 (₩)">
+                <div v-if="modalType === 'shopping'" class="space-y-4">
+                    <h2 class="text-center text-lg font-black">新增購物項目</h2>
                     <div class="flex gap-4">
-                        <button @click="saveShopping('惠')" class="flex-1 py-5 bg-rose-400 text-white rounded-[1.8rem] font-black">惠 的購物</button>
-                        <button @click="saveShopping('凡')" class="flex-1 py-5 bg-blue-400 text-white rounded-[1.8rem] font-black">凡 的購物</button>
+                        <div class="w-24 h-24 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center relative overflow-hidden shrink-0">
+                            <input type="file" @change="handlePhotoUpload" accept="image/*" class="absolute inset-0 opacity-0 z-10">
+                            <img v-if="tempPhoto" :src="tempPhoto" class="w-full h-full object-cover">
+                            <div v-else class="text-center"><i data-lucide="camera" class="w-6 h-6 mx-auto text-slate-300"></i><p class="text-[8px] text-slate-300 font-black mt-1">上傳圖片</p></div>
+                        </div>
+                        <div class="flex-1 space-y-4">
+                            <input v-model="form.title" class="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="品項名稱">
+                            <input v-model="form.price" type="number" class="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="₩ 價格">
+                        </div>
+                    </div>
+                    <div class="flex gap-4 mt-2">
+                        <button @click="saveShopping('惠')" class="flex-1 py-5 bg-rose-400 text-white rounded-[1.8rem] font-black">惠</button>
+                        <button @click="saveShopping('凡')" class="flex-1 py-5 bg-blue-400 text-white rounded-[1.8rem] font-black">凡</button>
                     </div>
                 </div>
 
-                <div v-if="activeTab === 'budget'" class="space-y-4">
-                    <h2 class="text-center text-lg font-black">記錄共同支出</h2>
-                    <input v-model="form.title" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="支出項目">
-                    <input v-model="form.price" type="number" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="金額 (₩)">
-                    <div class="flex gap-4">
-                        <button @click="saveBudget('惠')" class="flex-1 py-5 bg-rose-400 text-white rounded-[1.8rem] font-black">惠 先墊付</button>
-                        <button @click="saveBudget('凡')" class="flex-1 py-5 bg-blue-400 text-white rounded-[1.8rem] font-black">凡 先墊付</button>
-                    </div>
+                <div v-if="modalType === 'wishlist' || modalType === 'budget'" class="space-y-4">
+                    <input v-model="form.title" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="名稱/項目">
+                    <input v-if="modalType==='budget'" v-model="form.price" type="number" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="₩ 金額">
+                    <input v-if="modalType==='wishlist'" v-model="form.addr" class="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="地址">
+                    <div v-if="modalType==='budget'" class="flex gap-4"><button @click="saveBudget('惠')" class="flex-1 py-5 bg-rose-400 text-white rounded-[1.8rem] font-black">惠</button><button @click="saveBudget('凡')" class="flex-1 py-5 bg-blue-400 text-white rounded-[1.8rem] font-black">凡</button></div>
+                    <button v-else @click="saveData" class="w-full py-5 bg-slate-800 text-white rounded-[2rem] font-black shadow-lg">儲存</button>
                 </div>
             </div>
         </div>
@@ -209,17 +187,12 @@
         <div v-if="driverTarget" class="fixed inset-0 z-[200] bg-white flex flex-col p-10">
             <button @click="driverTarget = null" class="absolute top-16 right-8 p-4 bg-slate-50 rounded-full text-slate-300"><i data-lucide="x" class="w-6 h-6"></i></button>
             <div class="flex-1 flex flex-col items-center justify-center text-center space-y-12">
-                <div class="space-y-3">
-                    <p class="text-orange-400 font-black tracking-[0.3em] uppercase text-xs">Destination:</p>
-                    <h2 class="text-5xl font-black text-slate-900 leading-tight">{{ driverTarget.title }}</h2>
-                </div>
-                <div @click="openGoogleMaps(driverTarget.addr)" class="p-10 bg-orange-50/30 rounded-[3.5rem] w-full border border-orange-50 shadow-inner">
-                    <p class="text-3xl font-bold text-slate-700 leading-relaxed break-words">{{ driverTarget.addr }}</p>
-                </div>
-                <div class="opacity-10 flex flex-col items-center scale-150"><i data-lucide="car" class="w-12 h-12"></i><p class="text-[10px] font-black mt-2">TAXI MODE</p></div>
+                <p class="text-orange-400 font-black tracking-widest text-xs uppercase">Destination:</p>
+                <h2 class="text-5xl font-black text-slate-900 leading-tight">{{ driverTarget.title }}</h2>
+                <div class="p-10 bg-orange-50/30 rounded-[3.5rem] w-full border border-orange-50 shadow-inner"><p class="text-3xl font-bold text-slate-700 leading-relaxed">{{ driverTarget.addr }}</p></div>
+                <div class="opacity-10 scale-150"><i data-lucide="car" class="w-12 h-12"></i></div>
             </div>
         </div>
-
     </div>
 
     <script>
@@ -230,114 +203,115 @@
                 const activeTab = ref('itinerary');
                 const activeDay = ref(1);
                 const showAddModal = ref(false);
+                const modalType = ref('');
                 const editingItem = ref(null);
                 const driverTarget = ref(null);
                 const calcInput = ref('');
                 const shopBudgetLimit = ref(300000);
-                
-                const form = ref({ title: '', time: '', addr: '', price: '' });
+                const tempPhoto = ref(null);
+                const form = ref({ title: '', time: '', addr: '', price: '', note: '' });
 
-                // --- 資料持久化 ---
                 const load = (key, def) => JSON.parse(localStorage.getItem(key)) || def;
-                const itinerary = ref(load('seo-itinerary', [
-                    { id: '1-1', day: 1, time: '22:05', title: '抵達仁川 T2', addr: '인천국제공항 제2여객터미널', note: '下機後找 6015 深夜巴士或機場快線' },
-                    { id: '1-2', day: 1, time: '01:00', title: '飯店 Check-in', addr: '서울특별시 중구 남대門로5길 15', note: '首爾明洞相鐵喜普樂吉酒店' }
+                const itinerary = ref(load('seo-v5-itinerary', [
+                    { id: '1-1', day: 1, time: '22:05', title: '抵達仁川 T2', addr: '인천국제공항 제2여객터미널', note: '下機後找 6015 深夜巴士或機場快線' }
                 ]));
-                const shopping = ref(load('seo-shopping', []));
-                const budget = ref(load('seo-budget', []));
+                const shopping = ref(load('seo-v5-shopping', []));
+                const budget = ref(load('seo-v5-budget', []));
+                const wishlist = ref(load('seo-v5-wishlist', []));
                 const hotelInfo = ref({ name: '首爾明洞相鐵喜普樂吉酒店', addr: '首爾特別市中區南大門路5街 15', tel: '+82 2-2129-5407' });
 
-                watch([itinerary, shopping, budget], () => {
-                    localStorage.setItem('seo-itinerary', JSON.stringify(itinerary.value));
-                    localStorage.setItem('seo-shopping', JSON.stringify(shopping.value));
-                    localStorage.setItem('seo-budget', JSON.stringify(budget.value));
+                watch([itinerary, shopping, budget, wishlist, shopBudgetLimit], () => {
+                    localStorage.setItem('seo-v5-itinerary', JSON.stringify(itinerary.value));
+                    localStorage.setItem('seo-v5-shopping', JSON.stringify(shopping.value));
+                    localStorage.setItem('seo-v5-budget', JSON.stringify(budget.value));
+                    localStorage.setItem('seo-v5-wishlist', JSON.stringify(wishlist.value));
                 }, { deep: true });
 
-                const tabs = [
-                    { id: 'itinerary', icon: 'map', label: '行程' },
-                    { id: 'shopping', icon: 'shopping-bag', label: '購物' },
-                    { id: 'budget', icon: 'wallet', label: '記帳' },
-                    { id: 'info', icon: 'info', label: '工具' }
-                ];
+                const stats = computed(() => ({
+                    spentShop: shopping.value.filter(s => s.bought).reduce((a, b) => a + Number(b.price || 0), 0),
+                    totalExp: budget.value.reduce((a, b) => a + Number(b.p || 0), 0),
+                    huiPay: budget.value.filter(b => b.payer === '惠').reduce((a, b) => a + Number(b.p || 0), 0),
+                    fanPay: budget.value.filter(b => b.payer === '凡').reduce((a, b) => a + Number(b.p || 0), 0),
+                    huiSelf: shopping.value.filter(s => s.owner === '惠').reduce((a, b) => a + Number(b.price || 0), 0),
+                    fanSelf: shopping.value.filter(s => s.owner === '凡').reduce((a, b) => a + Number(b.price || 0), 0)
+                }));
 
-                const filteredItinerary = computed(() => {
-                    return itinerary.value.filter(i => Number(i.day) === activeDay.value);
-                });
-
-                const stats = computed(() => {
-                    return {
-                        spentShop: shopping.value.filter(s => s.bought).reduce((a, b) => a + Number(b.price), 0),
-                        totalExp: budget.value.reduce((a, b) => a + Number(b.p), 0),
-                        huiPay: budget.value.filter(b => b.payer === '惠').reduce((a, b) => a + Number(b.p), 0),
-                        fanPay: budget.value.filter(b => b.payer === '凡').reduce((a, b) => a + Number(b.p), 0),
-                        huiSelf: shopping.value.filter(s => s.owner === '惠').reduce((a, b) => a + Number(b.price), 0),
-                        fanSelf: shopping.value.filter(s => s.owner === '凡').reduce((a, b) => a + Number(b.price), 0)
-                    };
-                });
-
+                const filteredItinerary = computed(() => itinerary.value.filter(i => Number(i.day) === activeDay.value));
                 const getDayDetail = (dayNum) => {
-                    const date = new Date('2026-05-16');
-                    date.setDate(date.getDate() + (dayNum - 1));
-                    return { date: `${date.getMonth()+1}/${date.getDate()}`, week: `週${['日','一','二','三','四','五','六'][date.getDay()]}` };
+                    const d = new Date('2026-05-16'); d.setDate(d.getDate() + (dayNum - 1));
+                    return { date: `${d.getMonth()+1}/${d.getDate()}`, week: `週${['日','一','二','三','四','五','六'][d.getDay()]}` };
                 };
 
-                const openEdit = (item) => {
-                    editingItem.value = item;
-                    form.value = { title: item.title, time: item.time, addr: item.addr };
+                const moveItem = (id, direction) => {
+                    const dayItems = [...filteredItinerary.value]; const index = dayItems.findIndex(i => i.id === id);
+                    if ((direction === 'up' && index === 0) || (direction === 'down' && index === dayItems.length - 1)) return;
+                    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+                    [dayItems[index], dayItems[targetIdx]] = [dayItems[targetIdx], dayItems[index]];
+                    const otherItems = itinerary.value.filter(i => Number(i.day) !== activeDay.value);
+                    itinerary.value = [...otherItems, ...dayItems];
+                };
+
+                const handlePhotoUpload = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (f) => { tempPhoto.value = f.target.result; };
+                    reader.readAsDataURL(file);
+                };
+
+                const openAddModal = (type) => {
+                    modalType.value = type; editingItem.value = null; tempPhoto.value = null;
+                    form.value = { title: '', time: '', addr: '', price: '', note: '' };
                     showAddModal.value = true;
                 };
 
-                const saveItinerary = () => {
-                    if (editingItem.value) {
-                        const idx = itinerary.value.findIndex(i => i.id === editingItem.value.id);
-                        itinerary.value[idx] = { ...itinerary.value[idx], ...form.value };
-                    } else {
-                        itinerary.value.push({ id: Date.now(), day: activeDay.value, ...form.value, note: '' });
+                const openEdit = (item) => {
+                    modalType.value = 'itinerary'; editingItem.value = item;
+                    form.value = { title: item.title, time: item.time, addr: item.addr, note: item.note || '' };
+                    showAddModal.value = true;
+                };
+
+                const saveData = () => {
+                    if (modalType.value === 'itinerary') {
+                        if (editingItem.value) {
+                            const idx = itinerary.value.findIndex(i => i.id === editingItem.value.id);
+                            itinerary.value[idx] = { ...itinerary.value[idx], ...form.value };
+                        } else {
+                            itinerary.value.push({ id: Date.now().toString(), day: activeDay.value, ...form.value });
+                        }
+                    } else if (modalType.value === 'wishlist') {
+                        wishlist.value.push({ id: Date.now().toString(), name: form.value.title, addr: form.value.addr });
                     }
                     closeModal();
                 };
 
                 const saveShopping = (owner) => {
-                    shopping.value.push({ id: Date.now(), name: form.value.title, price: form.value.price, owner, bought: false });
+                    shopping.value.push({ id: Date.now().toString(), name: form.value.title, price: form.value.price, owner, bought: false, photo: tempPhoto.value });
                     closeModal();
                 };
 
                 const saveBudget = (payer) => {
-                    budget.value.push({ id: Date.now(), n: form.value.title, p: form.value.price, payer });
+                    budget.value.push({ id: Date.now().toString(), n: form.value.title, p: form.value.price, payer });
                     closeModal();
                 };
 
                 const deleteItem = (type, id) => {
                     if (type === 'shopping') shopping.value = shopping.value.filter(i => i.id !== id);
                     if (type === 'budget') budget.value = budget.value.filter(i => i.id !== id);
+                    if (type === 'wishlist') wishlist.value = wishlist.value.filter(i => i.id !== id);
                 };
 
-                const moveItem = (id, dir) => {
-                    const dayItems = [...filteredItinerary.value];
-                    const idx = dayItems.findIndex(i => i.id === id);
-                    if (dir === 'up' && idx > 0) [dayItems[idx], dayItems[idx-1]] = [dayItems[idx-1], dayItems[idx]];
-                    if (dir === 'down' && idx < dayItems.length-1) [dayItems[idx], dayItems[idx+1]] = [dayItems[idx+1], dayItems[idx]];
-                    
-                    const others = itinerary.value.filter(i => Number(i.day) !== activeDay.value);
-                    itinerary.value = [...others, ...dayItems];
-                };
-
-                const closeModal = () => {
-                    showAddModal.value = false;
-                    form.value = { title: '', time: '', addr: '', price: '' };
-                };
-
-                const openGoogleMaps = (addr) => {
-                    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=transit`, '_blank');
-                };
+                const closeModal = () => { showAddModal.value = false; };
+                const openGoogleMaps = (a) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(a)}&travelmode=transit`, '_blank');
+                const tabs = [{id:'itinerary',icon:'map',label:'行程'},{id:'shopping',icon:'shopping-bag',label:'購物'},{id:'budget',icon:'wallet',label:'記帳'},{id:'info',icon:'info',label:'工具'}];
 
                 onMounted(() => lucide.createIcons());
-                watch([activeTab, showAddModal, driverTarget], () => nextTick(() => lucide.createIcons()));
+                watch([activeTab, activeDay, showAddModal, driverTarget], () => nextTick(() => lucide.createIcons()));
 
                 return {
-                    activeTab, activeDay, tabs, itinerary, filteredItinerary, shopping, budget, hotelInfo,
-                    stats, shopBudgetLimit, calcInput, showAddModal, editingItem, form, driverTarget,
-                    getDayDetail, openEdit, saveItinerary, saveShopping, saveBudget, deleteItem, moveItem, openGoogleMaps
+                    activeTab, activeDay, tabs, itinerary, filteredItinerary, shopping, budget, wishlist, hotelInfo,
+                    stats, shopBudgetLimit, calcInput, showAddModal, modalType, editingItem, form, driverTarget, tempPhoto,
+                    getDayDetail, openAddModal, openEdit, saveData, saveShopping, saveBudget, deleteItem, moveItem, openGoogleMaps, closeModal, handlePhotoUpload
                 };
             }
         }).mount('#app');

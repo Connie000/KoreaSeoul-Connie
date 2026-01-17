@@ -1,0 +1,480 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import {
+  MapPin, Clock, Check, Trash2, Plus, ShoppingBag,
+  Map as MapIcon, Info, ChevronUp, ChevronDown,
+  RefreshCw, Wallet, Phone, Car, X, Edit3, 
+  ArrowRightLeft, Building2, AlertCircle, User, Calendar, Camera, Store
+} from 'lucide-react';
+
+// --- Firebase 配置 ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'seoul-diary-pro-v4';
+
+// 旅遊開始日期
+const START_DATE = new Date('2026-05-16');
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState('itinerary');
+  const [activeDay, setActiveDay] = useState(1);
+  const [loading, setLoading] = useState(true);
+
+  // --- 初始行程資料 ---
+  const defaultItinerary = [
+    { id: '1-1', day: 1, time: '22:05', title: '抵達仁川 T2', addr: '인천국제공항 제2여객터미널', note: '下機後找 6015 深夜巴士或機場快線' },
+    { id: '1-2', day: 1, time: '01:00', title: '飯店 Check-in', addr: '서울특별시 중구 남대門로5길 15', note: '首爾明洞相鐵喜普樂吉酒店' },
+    { id: '2-2', day: 2, time: '10:30', title: '西花韓服體驗', addr: '서울특별시 종로구 사직로 137', note: '穿韓服進入景福宮' }
+  ];
+
+  // --- 資料狀態 ---
+  const [itinerary, setItinerary] = useState(defaultItinerary);
+  const [shopping, setShopping] = useState([]);
+  const [wishlist, setWishlist] = useState([]); // 想去景點
+  const [budget, setBudget] = useState([]);
+  const [shopBudgetLimit, setShopBudgetLimit] = useState(300000);
+  const [krwRate, setKrwRate] = useState(0.024);
+  const [hotelInfo, setHotelInfo] = useState({ name: '首爾明洞相鐵喜普樂吉酒店', addr: '首爾特別市中區南大門路5街 15', tel: '+82 2-2129-5407' });
+
+  const [calcInput, setCalcInput] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [driverTarget, setDriverTarget] = useState(null);
+
+  // --- 身份驗證與同步 ---
+  useEffect(() => {
+    const initAuth = async () => {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'appData', 'main');
+    const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setItinerary(data.itinerary || defaultItinerary);
+        setShopping(data.shopping || []);
+        setWishlist(data.wishlist || []);
+        setBudget(data.budget || []);
+        setShopBudgetLimit(data.shopBudgetLimit || 300000);
+        setKrwRate(data.krwRate || 0.024);
+        setHotelInfo(data.hotelInfo || { name: '首爾明洞相鐵喜普樂吉酒店', addr: '首爾特別市中區南大門路5街 15', tel: '+82 2-2129-5407' });
+      } else {
+        setDoc(docRef, { itinerary: defaultItinerary, shopping: [], wishlist: [], budget: [], shopBudgetLimit: 300000, krwRate: 0.024, hotelInfo: { name: '首爾明洞相鐵喜普樂吉酒店', addr: '首爾特別市中區南大門路5街 15', tel: '+82 2-2129-5407' } });
+      }
+      setLoading(false);
+    }, () => setLoading(false));
+    return () => unsubscribe();
+  }, [user]);
+
+  const saveToCloud = async (updates) => {
+    if (!user) return;
+    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'appData', 'main');
+    await setDoc(docRef, {
+      itinerary, shopping, wishlist, budget, shopBudgetLimit, krwRate, hotelInfo, ...updates
+    }, { merge: true });
+  };
+
+  // --- 工具函數 ---
+  const getDayDetail = (dayNum) => {
+    const date = new Date(START_DATE);
+    date.setDate(date.getDate() + (dayNum - 1));
+    const mm = date.getMonth() + 1;
+    const dd = date.getDate();
+    const week = WEEKDAYS[date.getDay()];
+    return { date: `${mm}/${dd}`, week: `週${week}` };
+  };
+
+  const moveItem = (id, direction) => {
+    const dayItems = itinerary.filter(i => Number(i.day) === activeDay);
+    const index = dayItems.findIndex(i => i.id === id);
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === dayItems.length - 1)) return;
+    const otherItems = itinerary.filter(i => Number(i.day) !== activeDay);
+    const newDayItems = [...dayItems];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    [newDayItems[index], newDayItems[targetIndex]] = [newDayItems[targetIndex], newDayItems[index]];
+    const final = [...otherItems, ...newDayItems];
+    setItinerary(final);
+    saveToCloud({ itinerary: final });
+  };
+
+  const stats = useMemo(() => {
+    const spentShop = shopping.filter(s => s.bought).reduce((a, b) => a + Number(b.price || 0), 0);
+    const totalExp = budget.reduce((a, b) => a + Number(b.p || 0), 0);
+    const huiPay = budget.filter(b => b.payer === '惠').reduce((a, b) => a + Number(b.p || 0), 0);
+    const fanPay = budget.filter(b => b.payer === '凡').reduce((a, b) => a + Number(b.p || 0), 0);
+    const huiSelf = shopping.filter(s => s.owner === '惠').reduce((a, b) => a + Number(b.price || 0), 0);
+    const fanSelf = shopping.filter(s => s.owner === '凡').reduce((a, b) => a + Number(b.price || 0), 0);
+    return { spentShop, totalExp, huiPay, fanPay, huiSelf, fanSelf };
+  }, [shopping, budget]);
+
+  if (loading) return <div className="h-screen w-full flex items-center justify-center bg-[#FFFCF5]"><RefreshCw className="animate-spin text-orange-200" /></div>;
+
+  return (
+    <div className="h-screen w-full flex flex-col bg-[#FFFCF5] font-sans overflow-hidden select-none text-slate-700">
+      
+      {/* Header */}
+      <header className="pt-14 pb-4 px-6 bg-white/60 backdrop-blur-lg border-b border-orange-50 flex justify-between items-end shrink-0 z-40">
+        <div>
+          <h1 className="text-xl font-black tracking-tight flex items-center gap-2">首爾日記 <span className="text-rose-300">🇰🇷</span></h1>
+          <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mt-0.5">May 2026 • Seoul Journey</p>
+        </div>
+        <button onClick={() => setActiveTab('info')} className="p-2.5 bg-orange-50 text-orange-400 rounded-2xl active:scale-90 transition-transform"><Info size={18} /></button>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto px-5 pt-4 pb-32 no-scrollbar">
+        
+        {/* 行程分頁 */}
+        {activeTab === 'itinerary' && (
+          <div className="space-y-4">
+            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+              {[1, 2, 3, 4, 5].map(d => {
+                const detail = getDayDetail(d);
+                return (
+                  <button
+                    key={d}
+                    onClick={() => setActiveDay(d)}
+                    className={`flex-shrink-0 w-16 h-20 rounded-[1.8rem] flex flex-col items-center justify-center transition-all ${activeDay === d ? 'bg-orange-100 text-orange-600 shadow-sm scale-105' : 'bg-white text-slate-300 border border-slate-50'}`}
+                  >
+                    <span className="text-[10px] font-black opacity-60">{detail.date}</span>
+                    <span className="text-lg font-black">{d}</span>
+                    <span className="text-[9px] font-bold opacity-60">{detail.week}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="space-y-4">
+              {itinerary.filter(i => Number(i.day) === activeDay).map((item, idx, arr) => (
+                <div key={item.id} className="bg-white p-5 rounded-[2.2rem] shadow-sm border border-orange-50 relative group transition-all active:bg-orange-50/20">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="flex items-center gap-1.5 text-[11px] font-black text-orange-300">
+                      <Clock size={12} strokeWidth={3} /> {item.time}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => { setEditingItem(item); setShowAddModal(true); }} className="p-1.5 text-slate-300 hover:text-orange-400"><Edit3 size={15}/></button>
+                      <button onClick={() => moveItem(item.id, 'up')} className={`p-1.5 ${idx === 0 ? 'text-slate-100' : 'text-slate-300'}`} disabled={idx === 0}><ChevronUp size={15}/></button>
+                      <button onClick={() => moveItem(item.id, 'down')} className={`p-1.5 ${idx === arr.length - 1 ? 'text-slate-100' : 'text-slate-300'}`} disabled={idx === arr.length - 1}><ChevronDown size={15}/></button>
+                    </div>
+                  </div>
+                  <h3 className="text-base font-black text-slate-800 leading-tight">{item.title}</h3>
+                  <p className="text-[12px] text-blue-400 mt-1.5 mb-3 flex items-start gap-1 font-bold" onClick={() => setDriverTarget(item)}>
+                    <MapPin size={12} className="shrink-0 mt-0.5" /> {item.addr}
+                  </p>
+                  {item.note && (
+                    <div className="bg-slate-50/50 p-3.5 rounded-2xl text-[11px] text-slate-400 leading-relaxed font-medium border border-slate-100/50">
+                      {item.note}
+                    </div>
+                  )}
+                  <button onClick={() => setDriverTarget(item)} className="absolute bottom-4 right-4 bg-white border border-orange-100 text-orange-400 p-3 rounded-2xl shadow-sm active:scale-95"><Car size={18} /></button>
+                </div>
+              ))}
+              <button onClick={() => { setEditingItem(null); setShowAddModal(true); }} className="w-full py-5 bg-white border-2 border-dashed border-orange-100 rounded-[2.2rem] text-orange-200 font-black text-xs uppercase tracking-widest">+ 新增行程項目</button>
+            </div>
+          </div>
+        )}
+
+        {/* 購物分頁 */}
+        {activeTab === 'shopping' && (
+          <div className="space-y-5">
+            <div className="bg-gradient-to-br from-rose-50 to-orange-50 p-7 rounded-[2.8rem] border border-white shadow-sm relative overflow-hidden">
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">購物支出總計</p>
+                  <h2 className="text-3xl font-black text-slate-800">₩ {stats.spentShop.toLocaleString()}</h2>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-slate-300 mb-1">預算上限</p>
+                  <input type="number" className="bg-transparent text-xl font-black text-orange-400 text-right w-24 outline-none border-b border-orange-100" value={shopBudgetLimit} onChange={e => {setShopBudgetLimit(e.target.value); saveToCloud({shopBudgetLimit: e.target.value})}} />
+                </div>
+              </div>
+              <div className="h-2 bg-white rounded-full overflow-hidden mb-6">
+                <div className="h-full bg-rose-300 transition-all duration-500" style={{ width: `${Math.min((stats.spentShop / shopBudgetLimit) * 100, 100)}%` }}></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/40 p-3 rounded-2xl border border-white">
+                  <p className="text-[9px] font-black text-rose-300 uppercase mb-1">惠 個人</p>
+                  <p className="text-sm font-bold">₩{stats.huiSelf.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/40 p-3 rounded-2xl border border-white">
+                  <p className="text-[9px] font-black text-blue-300 uppercase mb-1">凡 個人</p>
+                  <p className="text-sm font-bold">₩{stats.fanSelf.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {shopping.map(s => (
+                <div key={s.id} className={`bg-white p-4 rounded-[2rem] flex items-center gap-4 border border-slate-50 shadow-sm transition-all ${s.bought ? 'opacity-50 grayscale' : ''}`}>
+                  <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center overflow-hidden shrink-0 border border-slate-100">
+                    {s.img ? <img src={s.img} className="w-full h-full object-cover" /> : <Camera size={20} className="text-slate-200" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-black text-slate-800 text-sm">{s.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[11px] font-black text-orange-400">₩{Number(s.price).toLocaleString()}</span>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md ${s.owner === '惠' ? 'bg-rose-50 text-rose-400' : 'bg-blue-50 text-blue-400'}`}>{s.owner}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => {
+                    const updated = shopping.map(x => x.id === s.id ? {...x, bought: !x.bought} : x);
+                    setShopping(updated); saveToCloud({ shopping: updated });
+                  }} className={`w-9 h-9 rounded-xl border-2 flex items-center justify-center transition-all ${s.bought ? 'bg-emerald-400 border-emerald-400 text-white' : 'border-slate-100 text-transparent'}`}><Check size={16} strokeWidth={4}/></button>
+                  <button onClick={() => {
+                    const updated = shopping.filter(x => x.id !== s.id);
+                    setShopping(updated); saveToCloud({ shopping: updated });
+                  }} className="text-slate-200 p-2"><Trash2 size={16}/></button>
+                </div>
+              ))}
+              <button onClick={() => { setActiveTab('shopping'); setShowAddModal(true); }} className="w-full py-5 bg-white border-2 border-dashed border-rose-100 rounded-[2rem] text-rose-200 font-black text-xs uppercase tracking-widest">+ 新增購物項目</button>
+            </div>
+          </div>
+        )}
+
+        {/* 記帳分頁 */}
+        {activeTab === 'budget' && (
+          <div className="space-y-5">
+            <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm text-center relative overflow-hidden">
+              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-3">共同開銷總覽</p>
+              <h2 className="text-4xl font-black text-slate-800">₩ {stats.totalExp.toLocaleString()}</h2>
+              <div className="grid grid-cols-2 gap-6 mt-8 pt-6 border-t border-slate-50">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-rose-300">惠 先付</p>
+                  <p className="text-base font-black">₩{stats.huiPay.toLocaleString()}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-blue-300">凡 先付</p>
+                  <p className="text-base font-black">₩{stats.fanPay.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              {budget.map(b => (
+                <div key={b.id} className="bg-white p-4.5 rounded-[1.8rem] flex justify-between items-center shadow-sm border border-slate-50">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-9 h-9 rounded-2xl flex items-center justify-center text-[10px] font-black ${b.payer === '惠' ? 'bg-rose-50 text-rose-400' : 'bg-blue-50 text-blue-400'}`}>{b.payer}</span>
+                    <span className="font-black text-slate-700 text-sm">{b.n}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <p className="text-sm font-black">₩{Number(b.p).toLocaleString()}</p>
+                    <button onClick={() => { const updated = budget.filter(x => x.id !== b.id); setBudget(updated); saveToCloud({ budget: updated }); }} className="text-slate-200"><X size={18}/></button>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => setShowAddModal(true)} className="w-full py-5 bg-slate-800 text-white rounded-[2.2rem] font-black shadow-lg text-xs tracking-widest mt-4">+ 記錄公積金支出</button>
+            </div>
+          </div>
+        )}
+
+        {/* 工具分頁 */}
+        {activeTab === 'info' && (
+          <div className="space-y-6">
+            {/* 匯率換算 */}
+            <div className="bg-white p-6 rounded-[2.5rem] border border-orange-50 shadow-sm">
+              <p className="text-[11px] font-black text-slate-300 mb-5 flex items-center gap-2 uppercase tracking-widest"><ArrowRightLeft size={14}/> 匯率換算 (約 1:{1/krwRate})</p>
+              <div className="flex items-center gap-4">
+                <div className="flex-1 bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <p className="text-[9px] font-black text-slate-300 mb-1">KRW ₩</p>
+                  <input type="number" className="w-full font-black text-lg bg-transparent outline-none" placeholder="0" value={calcInput} onChange={e => setCalcInput(e.target.value)} />
+                </div>
+                <div className="flex-1 bg-orange-50 rounded-2xl p-4 border border-orange-100 text-orange-600">
+                  <p className="text-[9px] font-black opacity-60 mb-1">TWD NT$</p>
+                  <p className="text-lg font-black">{calcInput ? Math.round(calcInput * krwRate).toLocaleString() : '0'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 想去景點 (新功能) */}
+            <div className="bg-white p-6 rounded-[2.8rem] border border-orange-50 shadow-sm">
+              <div className="flex justify-between items-center mb-5">
+                <h3 className="font-black text-[11px] text-slate-400 uppercase tracking-widest flex items-center gap-2"><MapIcon size={16}/> 想去景點口袋名單</h3>
+                <button onClick={() => { setEditingItem('wishlist'); setShowAddModal(true); }} className="p-1.5 bg-orange-50 text-orange-400 rounded-xl"><Plus size={16}/></button>
+              </div>
+              <div className="space-y-3">
+                {wishlist.length === 0 && <p className="text-center py-8 text-xs text-slate-300 font-bold">目前沒有收藏的景點</p>}
+                {wishlist.map(w => (
+                  <div key={w.id} className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                    <div className="flex justify-between">
+                      <p className="font-black text-sm text-slate-800">{w.name}</p>
+                      <button onClick={() => { const updated = wishlist.filter(x => x.id !== w.id); setWishlist(updated); saveToCloud({ wishlist: updated }); }} className="text-slate-200"><X size={14}/></button>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-[10px] text-slate-400 flex items-center gap-1"><Clock size={10}/> {w.time || '未註記時間'}</p>
+                      <p className="text-[10px] text-blue-400 flex items-start gap-1"><MapPin size={10} className="mt-0.5"/> {w.addr}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 住宿資訊 */}
+            <div className="bg-blue-50 p-8 rounded-[2.8rem] text-blue-600 border border-blue-100 relative overflow-hidden">
+               <Building2 className="absolute -right-6 -bottom-6 opacity-10" size={140} />
+               <h3 className="font-black text-xs mb-5 flex items-center gap-2 uppercase tracking-widest"><Building2 size={16}/> 住宿資訊</h3>
+               <p className="text-xl font-black leading-tight mb-3">{hotelInfo.name}</p>
+               <p className="text-[11px] opacity-70 leading-relaxed flex items-start gap-2 mb-4 font-bold"><MapPin size={12} className="shrink-0 mt-0.5"/> {hotelInfo.addr}</p>
+               <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-xl text-xs font-black shadow-sm"><Phone size={12}/> {hotelInfo.tel}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer Nav */}
+      <nav className="fixed bottom-0 left-0 right-0 h-28 bg-white/70 backdrop-blur-xl border-t border-orange-50 flex justify-around items-center px-6 pb-8 z-50">
+        {[
+          { id: 'itinerary', icon: MapIcon, label: '行程' },
+          { id: 'shopping', icon: ShoppingBag, label: '購物' },
+          { id: 'budget', icon: Wallet, label: '記帳' },
+          { id: 'info', icon: Info, label: '工具' }
+        ].map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === t.id ? 'text-orange-400 scale-105' : 'text-slate-300'}`}>
+            <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === t.id ? 'bg-orange-50' : ''}`}>
+              <t.icon size={22} strokeWidth={activeTab === t.id ? 2.5 : 2} />
+            </div>
+            <span className="text-[10px] font-black tracking-tighter uppercase">{t.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* Add/Edit Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-[100] flex items-end">
+          <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity" onClick={() => setShowAddModal(false)} />
+          <div className="relative w-full bg-white rounded-t-[3rem] p-8 pb-14 shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8" />
+            
+            {/* 行程編輯/新增 */}
+            {activeTab === 'itinerary' && (
+              <div className="space-y-4">
+                <h2 className="text-center text-lg font-black">{editingItem ? '編輯行程' : `新增行程 (Day ${activeDay})`}</h2>
+                <input id="n-t" defaultValue={editingItem?.title || ''} className="w-full p-5 bg-slate-50 rounded-2xl font-bold border border-transparent focus:border-orange-100 outline-none" placeholder="景點名稱" />
+                <input id="n-h" defaultValue={editingItem?.time || ''} className="w-full p-5 bg-slate-50 rounded-2xl font-bold border border-transparent focus:border-orange-100 outline-none" placeholder="時間 (如 12:00)" />
+                <input id="n-a" defaultValue={editingItem?.addr || ''} className="w-full p-5 bg-slate-50 rounded-2xl font-bold border border-transparent focus:border-orange-100 outline-none" placeholder="地址" />
+                <button onClick={async () => {
+                  const title = document.getElementById('n-t').value;
+                  const time = document.getElementById('n-h').value;
+                  const addr = document.getElementById('n-a').value;
+                  if (!title) return;
+                  let updated;
+                  if (editingItem) {
+                    updated = itinerary.map(i => i.id === editingItem.id ? {...i, title, time, addr} : i);
+                  } else {
+                    updated = [...itinerary, { id: Date.now().toString(), day: activeDay, time, title, addr, note: '' }];
+                  }
+                  setItinerary(updated); saveToCloud({ itinerary: updated }); setShowAddModal(false);
+                }} className="w-full py-5 bg-slate-800 text-white rounded-[2rem] font-black shadow-lg mt-4">儲存行程</button>
+              </div>
+            )}
+
+            {/* 購物項目新增 */}
+            {activeTab === 'shopping' && (
+              <div className="space-y-4">
+                <h2 className="text-center text-lg font-black">新增購物項目</h2>
+                <div className="flex justify-center mb-2">
+                   <div className="w-20 h-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300">
+                      <Camera size={24}/>
+                   </div>
+                </div>
+                <input id="s-n" className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="品項名稱" />
+                <input id="s-p" type="number" className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="預估價格 (₩)" />
+                <div className="flex gap-4">
+                  <button onClick={async () => {
+                    const name = document.getElementById('s-n').value;
+                    const price = document.getElementById('s-p').value;
+                    if (!name) return;
+                    const updated = [...shopping, { id: Date.now().toString(), name, price: Number(price), bought: false, owner: '惠', img: '' }];
+                    setShopping(updated); saveToCloud({ shopping: updated }); setShowAddModal(false);
+                  }} className="flex-1 py-5 bg-rose-400 text-white rounded-[1.8rem] font-black shadow-md">惠 的購物</button>
+                  <button onClick={async () => {
+                    const name = document.getElementById('s-n').value;
+                    const price = document.getElementById('s-p').value;
+                    if (!name) return;
+                    const updated = [...shopping, { id: Date.now().toString(), name, price: Number(price), bought: false, owner: '凡', img: '' }];
+                    setShopping(updated); saveToCloud({ shopping: updated }); setShowAddModal(false);
+                  }} className="flex-1 py-5 bg-blue-400 text-white rounded-[1.8rem] font-black shadow-md">凡 的購物</button>
+                </div>
+              </div>
+            )}
+
+            {/* 記帳新增 */}
+            {activeTab === 'budget' && (
+              <div className="space-y-4">
+                <h2 className="text-center text-lg font-black">記錄共同支出</h2>
+                <input id="b-n" className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="支出項目 (如: 晚餐、計程車)" />
+                <input id="b-p" type="number" className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="金額 (₩)" />
+                <div className="flex gap-4">
+                  <button onClick={async () => {
+                    const n = document.getElementById('b-n').value;
+                    const p = document.getElementById('b-p').value;
+                    if (!n) return;
+                    const updated = [...budget, { id: Date.now().toString(), n, p: Number(p), payer: '惠' }];
+                    setBudget(updated); saveToCloud({ budget: updated }); setShowAddModal(false);
+                  }} className="flex-1 py-5 bg-rose-400 text-white rounded-[1.8rem] font-black shadow-md">惠 先墊付</button>
+                  <button onClick={async () => {
+                    const n = document.getElementById('b-n').value;
+                    const p = document.getElementById('b-p').value;
+                    if (!n) return;
+                    const updated = [...budget, { id: Date.now().toString(), n, p: Number(p), payer: '凡' }];
+                    setBudget(updated); saveToCloud({ budget: updated }); setShowAddModal(false);
+                  }} className="flex-1 py-5 bg-blue-400 text-white rounded-[1.8rem] font-black shadow-md">凡 先墊付</button>
+                </div>
+              </div>
+            )}
+
+            {/* 想去景點新增 (工具分頁) */}
+            {activeTab === 'info' && editingItem === 'wishlist' && (
+              <div className="space-y-4">
+                <h2 className="text-center text-lg font-black text-slate-800">加入想去口袋名單</h2>
+                <input id="w-n" className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="地點名稱" />
+                <input id="w-t" className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="營業時間" />
+                <input id="w-a" className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none" placeholder="地址" />
+                <button onClick={async () => {
+                  const name = document.getElementById('w-n').value;
+                  const time = document.getElementById('w-t').value;
+                  const addr = document.getElementById('w-a').value;
+                  if (!name) return;
+                  const updated = [...wishlist, { id: Date.now().toString(), name, time, addr }];
+                  setWishlist(updated); saveToCloud({ wishlist: updated }); setShowAddModal(false);
+                }} className="w-full py-5 bg-orange-400 text-white rounded-[2rem] font-black shadow-lg">加入收藏</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Taxi Mode Overlay */}
+      {driverTarget && (
+        <div className="fixed inset-0 z-[200] bg-white flex flex-col p-10 animate-in fade-in zoom-in duration-300">
+          <button onClick={() => setDriverTarget(null)} className="absolute top-16 right-8 p-4 bg-slate-50 rounded-full text-slate-300 active:scale-90"><X size={24}/></button>
+          <div className="flex-1 flex flex-col items-center justify-center text-center space-y-12">
+            <div className="space-y-3">
+              <p className="text-orange-400 font-black tracking-[0.3em] uppercase text-xs">Destination:</p>
+              <h2 className="text-5xl font-black text-slate-900 leading-tight tracking-tighter">{driverTarget.title}</h2>
+            </div>
+            <div className="p-10 bg-orange-50/30 rounded-[3.5rem] w-full border border-orange-50 shadow-inner">
+              <p className="text-3xl font-bold text-slate-700 leading-relaxed break-words">{driverTarget.addr || '尚未輸入地址'}</p>
+            </div>
+            <div className="opacity-10 flex flex-col items-center transform scale-150"><Car size={48}/><p className="text-[10px] font-black mt-2 uppercase tracking-widest">Taxi Mode</p></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
